@@ -1,0 +1,161 @@
+<html>
+  <head>
+    <link rel="icon" type="image/x-icon" href="./images/favicon.ico" />
+  </head>
+  <script>
+    let eventSource = null;
+    let myUserName = "";
+    const eventUrl = "http://localhost:3000/events";
+    let lastTime = 0;
+    const regex = /^[a-zA-Z0-9]+$/;
+    let eventSourceTimer = null;
+
+    function loginUser() {
+      myUserName = document.getElementById("loginName").value;
+      myUserName = String(myUserName).trim();
+      if (!regex.test(myUserName)) {
+        alert("Username cannot be empty.");
+        return;
+      }
+      tempEventUrl = eventUrl;
+      tempEventUrl += "?userName=" + myUserName;
+      createEventSource(tempEventUrl);
+      showDivState(true);
+    }
+
+    function createEventSource(url) {
+      eventSource = new EventSource(url);
+      console.log(url);
+
+      eventSource.onmessage = (event) => {
+        console.log("Received:", JSON.parse(event.data));
+        let msgRec = JSON.parse(event.data);
+        if (msgRec.type == "heartbeat") {
+          return;
+        }
+        let msgs = msgRec.msgs;
+        msgs.forEach((msg, index) => {
+          console.log(msg);
+          let msgStr =
+            new Date(msg.createdTime).toString() +
+            ": (From: " +
+            msg.myUserName +
+            ") " +
+            msg.userMessage +
+            "<br>";
+          let txtMsg = document.getElementById("txtMsg");
+          txtMsg.innerHTML += msgStr;
+          lastTime = msg.createdTime;
+        });
+      };
+
+      eventSource.onerror = () => {
+        console.log("Connection lost. Recreating automatically...");
+        killEventSource();
+        tempEventUrl = eventUrl;
+        tempEventUrl += "?userName=" + myUserName;
+        eventSourceTimer = setTimeout(() => {
+          createEventSource(tempEventUrl);
+        }, 1000);
+      };
+    }
+
+    function killEventSource() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource.onmessage = null;
+        eventSource.onerror = null;
+        eventSource.onopen = null;
+        eventSource = null;
+      }
+    }
+
+    function logoutUser() {
+      killEventSource();
+      lastTime = 0;
+      showDivState(false);
+    }
+
+    function showDivState(state) {
+      document.getElementById("divLogin").hidden = state;
+      document.getElementById("divLogout").hidden = !state;
+      document.getElementById("divMsg").hidden = !state;
+      document.getElementById("txtMsg").innerHTML = "";
+    }
+
+    async function sendMsg() {
+      let userName = document.getElementById("userName").value;
+      let userMessage = document.getElementById("userMessage").value;
+      userName = String(userName).trim();
+      if (!regex.test(userName)) {
+        alert("Username cannot be empty.");
+        return;
+      } else if (
+        String(userName).toLowerCase() == String(myUserName).toLowerCase()
+      ) {
+        alert("Username cannot be the same as login user.");
+        return;
+      }
+      if (String(userMessage).trim() == "") {
+        alert("Message cannot be empty.");
+        return;
+      }
+
+      const url = "http://localhost:3000/msgs";
+      const payload = {
+        userName: userName,
+        userMessage: userMessage,
+        myUserName: myUserName,
+      };
+
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          alert(`HTTP error! Status: ${response.status}`);
+        }
+
+        const data = await response.json(); // Parse the JSON response
+        console.log("Success:", data);
+      } catch (error) {
+        console.error("Error:", error);
+      }
+    }
+
+    function bodyLoad() {
+      showDivState(false);
+    }
+  </script>
+  <body onload="bodyLoad()">
+    <div id="divLogin">
+      Name: <input type="text" id="loginName" maxlength="10" /><input
+        type="submit"
+        value="Login"
+        onclick="loginUser()"
+      />
+      <hr />
+    </div>
+    <div id="divLogout">
+      <input type="submit" value="Logout" onclick="logoutUser()" />
+    </div>
+    <div id="divMsg">
+      <div>
+        Message To: <br />
+        Username: <input type="text" id="userName" maxlength="10" /><br />
+        Message: <input type="text" id="userMessage" /><br />
+        <input type="submit" value="Send Message" onclick="sendMsg()" />
+        <hr />
+      </div>
+      <div>
+        Message From: <br />
+        <div id="txtMsg"></div>
+      </div>
+    </div>
+  </body>
+</html>
