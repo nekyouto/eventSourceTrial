@@ -14,3 +14,8 @@ A simple trial created for the JavaScript Object EventSource.
 3. Send a message to the corresponding user.
 4. When the message have been received via the EventSource object, the message will gradually appear on the same page.
 5. ![screenshot](./images/screenshot.png)
+
+# TODO
+- Adding a proper database connection/setup
+- Additional APIs: Login, fetch active user list
+- API security to be implemented
