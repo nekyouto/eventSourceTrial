@@ -7,9 +7,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+// Stores all the messages that receives from User(s). Should be wired to a Database instead.
 let msgs = [];
+// Stores all the active User(s)
 let activeUsers = [];
 
+// The EventSource will be connected to this API endpoint (Method: GET)
 app.get("/events", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -27,6 +30,12 @@ app.get("/events", (req, res) => {
     `data: ${JSON.stringify({ message: "Connection established", type: "heartbeat" })}\n\n`,
   );
 
+  /* 
+  On the timed interval of 5 seconds, we will send a message to the corresponding EventSource connection.
+  We will get the timing of the last message that was being sent to the User, used it to locate any newer 
+  messages that haven't being sent to the User yet. And send those messages out. If there are no new 
+  messages, we will just send a generic message.
+  */
   const intervalId = setInterval(() => {
     let lastMsgTime = 0;
     for (let i = 0; i < activeUsers.length; i++) {
@@ -57,6 +66,7 @@ app.get("/events", (req, res) => {
     }
   }, 5000);
 
+  // When the connection of the EventSource is closed, we will remove the connecting User from the active user list.
   req.on("close", () => {
     console.log("Client disconnected. Cleaning up...");
     const userName = req.query.userName;
@@ -69,6 +79,7 @@ app.get("/events", (req, res) => {
   });
 });
 
+// This API (Method: POST) will be used to store all the messages into the msgs variable.
 app.post("/msgs", (req, res) => {
   let msgBody = req.body;
   msgBody.createdTime = new Date().getTime();
